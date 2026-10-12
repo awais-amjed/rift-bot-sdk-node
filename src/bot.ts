@@ -81,6 +81,9 @@ export class Bot {
 
   /// Null when [listen] was told not to use Realtime.
   #realtime: RealtimeListener | null = null;
+  /// The server's presence topic, where the bot says it is running — the dot
+  /// beside it in a member's list. Nothing is read from it.
+  #presence: RealtimeListener | null = null;
   readonly #useRealtime: boolean;
 
   /// Set while a drain is queued from a broadcast, so a burst of them — a
@@ -286,7 +289,10 @@ export class Bot {
     this.#lastSeen = await this.#newestId();
     if (this.#onDirectMessage) this.#lastDm = await this.dms.newestId();
     this.#timer = setInterval(() => void this.#drain(onMessage), this.pollMs);
-    if (this.#useRealtime) this.#startRealtime(onMessage);
+    if (this.#useRealtime) {
+      this.#startRealtime(onMessage);
+      await this.#startPresence();
+    }
   }
 
   /**
@@ -302,6 +308,7 @@ export class Bot {
   async renewSession(): Promise<void> {
     await this.session.login();
     this.#realtime?.setToken(this.session.token ?? '');
+    this.#presence?.setToken(this.session.token ?? '');
   }
 
   stop(): void {
@@ -311,6 +318,8 @@ export class Bot {
     this.#queued = null;
     this.#realtime?.stop();
     this.#realtime = null;
+    this.#presence?.stop();
+    this.#presence = null;
   }
 
   /** Whether the bot is hearing the server rather than asking it. */
@@ -335,6 +344,28 @@ export class Bot {
       onError: (error) => this.#reportError(new BotError(error.message)),
     });
     this.#realtime.start();
+  }
+
+  /**
+   * Be online: announce this bot on the server's presence topic, the entry a
+   * member's app reads `userId` and `displayName` from.
+   */
+  async #startPresence(): Promise<void> {
+    const userId = this.session.userId;
+    if (userId === null) return;
+    const rows = await this.session.select<{ display_name: string | null }>(
+      `users?select=display_name&id=eq.${userId}`,
+    );
+    this.#presence = new RealtimeListener({
+      url: this.session.url,
+      anonKey: this.session.anonKey,
+      token: this.session.token ?? '',
+      topic: `presence:${this.session.serverId}`,
+      presence: { userId, displayName: rows[0]?.display_name ?? '' },
+      onEvent: () => {},
+      onError: (error) => this.#reportError(new BotError(error.message)),
+    });
+    this.#presence.start();
   }
 
   /** Coalesce a burst of announcements into one pass, a tick from now. */

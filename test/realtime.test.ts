@@ -166,3 +166,58 @@ test('stopping does not reconnect', () => {
 
   assert.equal(subject.connected, false);
 });
+
+function presenceListener() {
+  const socket = new FakeSocket();
+  const subject = new RealtimeListener({
+    url: 'https://server.invalid',
+    anonKey: 'sb_publishable_test',
+    token: 'jwt-1',
+    topic: 'presence:server-1',
+    presence: { userId: 'bot-1', displayName: 'DJ Riff' },
+    onEvent: () => {},
+    connect: () => socket,
+  });
+  return { subject, socket };
+}
+
+const tracks = (socket: FakeSocket) =>
+  socket.sent.filter((message) => message.event === 'presence');
+
+test('a listener with presence tracks it once its join is accepted', () => {
+  const { subject, socket } = presenceListener();
+  subject.start();
+  socket.open();
+
+  assert.equal(socket.join?.payload.config.presence.enabled, true);
+  assert.equal(tracks(socket).length, 0, 'not before the server has said yes');
+
+  socket.deliver({ topic: 'realtime:presence:server-1', event: 'phx_reply', ref: socket.join?.ref, payload: { status: 'ok' } });
+
+  const [track] = tracks(socket);
+  assert.equal(track.topic, 'realtime:presence:server-1');
+  assert.deepEqual(track.payload, {
+    type: 'presence',
+    event: 'track',
+    payload: { userId: 'bot-1', displayName: 'DJ Riff' },
+  });
+});
+
+test('presence is not tracked off a reply to something other than the join', () => {
+  const { subject, socket } = presenceListener();
+  subject.start();
+  socket.open();
+  socket.deliver({ topic: 'realtime:presence:server-1', event: 'phx_reply', ref: 'not-the-join', payload: { status: 'ok' } });
+  socket.deliver({ topic: 'realtime:presence:server-1', event: 'phx_reply', ref: socket.join?.ref, payload: { status: 'error', response: { reason: 'no' } } });
+  assert.equal(tracks(socket).length, 0);
+});
+
+test('a listener without presence joins with it off and never tracks', () => {
+  const { subject, socket } = listener();
+  subject.start();
+  socket.open();
+  socket.deliver({ topic: 'realtime:user:bot-1', event: 'phx_reply', ref: socket.join?.ref, payload: { status: 'ok' } });
+
+  assert.equal(socket.join?.payload.config.presence.enabled, false);
+  assert.equal(tracks(socket).length, 0);
+});

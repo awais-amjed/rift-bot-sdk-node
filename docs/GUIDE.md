@@ -391,6 +391,10 @@ that missed one and waited for the next would have stopped working without
 saying so. `new Bot(session, 2000, { realtime: false })` goes back to polling
 alone.
 
+`listen` also joins the server's presence topic and announces the bot there,
+which is what shows it as online in members' lists while it runs. Nothing is
+read from that topic. A bot polling alone joins neither, so it shows as offline.
+
 A session lasts an hour. The poll signs in again when one of its reads comes
 back 401, and tells the socket the new token. A call of your own can get there
 first — a panel redraw an hour into a playlist — so catch a `BotError` with

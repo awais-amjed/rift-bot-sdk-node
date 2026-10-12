@@ -62,6 +62,12 @@ export interface RealtimeOptions {
   /** The topic to join, without Phoenix's `realtime:` prefix. */
   topic: string;
   onEvent: (event: RealtimeEvent) => void;
+  /**
+   * What to announce on this topic's presence for as long as it is joined —
+   * how a member's app knows somebody is online. Absent, the topic is only
+   * listened to.
+   */
+  presence?: Record<string, unknown>;
   /** Told about a connection that failed or was refused. Never fatal. */
   onError?: (error: Error) => void;
   /** How to open the socket. Node's own `WebSocket` unless a test says else. */
@@ -82,6 +88,8 @@ export class RealtimeListener {
   #retry: ReturnType<typeof setTimeout> | null = null;
   #attempt = 0;
   #ref = 0;
+  /** The ref of the latest join, so its reply can be told from the others'. */
+  #joinRef: string | null = null;
   #token: string;
   #stopped = false;
 
@@ -149,14 +157,19 @@ export class RealtimeListener {
       // The topic is private, so the join carries the token the server checks
       // `app.can_use_topic` with. Without `private` it would join a different,
       // public topic of the same name and hear nothing.
+      this.#joinRef = String(++this.#ref);
       this.#send({
         topic: this.#phoenixTopic,
         event: 'phx_join',
         payload: {
-          config: { broadcast: { self: false }, private: true },
+          config: {
+            broadcast: { self: false },
+            presence: { key: '', enabled: this.#options.presence !== undefined },
+            private: true,
+          },
           access_token: this.#token,
         },
-        ref: String(++this.#ref),
+        ref: this.#joinRef,
       });
       this.#heartbeat = unref(
         setInterval(() => {
@@ -181,6 +194,7 @@ export class RealtimeListener {
       event?: string;
       payload?: Record<string, unknown>;
       topic?: string;
+      ref?: string;
     };
     try {
       frame = JSON.parse(data);
@@ -205,6 +219,12 @@ export class RealtimeListener {
     // is simply never joined, which otherwise looks like a quiet server.
     if (frame.event === 'phx_reply') {
       const payload = frame.payload ?? {};
+      // Tracked on every join, a rejoin included: the server forgets an
+      // entry when its socket drops, and joining again does not bring it back.
+      if (payload.status === 'ok' && frame.ref === this.#joinRef) {
+        this.#track();
+        return;
+      }
       if (payload.status === 'error') {
         const response = payload.response;
         const reason =
@@ -214,6 +234,17 @@ export class RealtimeListener {
         this.#report(new Error(`realtime: ${this.#options.topic}: ${reason}`));
       }
     }
+  }
+
+  #track(): void {
+    const presence = this.#options.presence;
+    if (presence === undefined) return;
+    this.#send({
+      topic: this.#phoenixTopic,
+      event: 'presence',
+      payload: { type: 'presence', event: 'track', payload: presence },
+      ref: String(++this.#ref),
+    });
   }
 
   #send(message: Record<string, unknown>): void {
