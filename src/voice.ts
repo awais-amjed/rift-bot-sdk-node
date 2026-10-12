@@ -270,9 +270,15 @@ export async function joinVoice(
     device_id: options.deviceId ?? channelId,
   });
   const token = data.token as string;
+  // A server with more than one region holds each call on one node, and the
+  // token is signed for that node alone: any other answers "invalid API key".
+  // The reply says which, so the default is only for a server too old to.
+  const url = typeof data.livekit_url === 'string' && data.livekit_url
+    ? data.livekit_url
+    : await livekitUrl(session);
 
   const room = new rtc.Room();
-  await room.connect(await livekitUrl(session), token, {
+  await room.connect(url, token, {
     autoSubscribe: true,
     e2ee: { keyProviderOptions: { sharedKey: media.key } },
   });
@@ -355,7 +361,8 @@ async function mediaKey(
 }
 
 /**
- * Where this server's LiveKit lives.
+ * Where this server's LiveKit lives, for a server whose token reply does not
+ * say (one from before voice regions).
  *
  * On the server's own `servers` row, which every member can read — the API
  * secret is the part that is hidden, and a bot never needs it because it never
