@@ -6,3 +6,6 @@ node_modules/
 # stray seed next to an example is a bot somebody else can be.
 *.seed
 .idea/
+
+# Built by `npm run build`, shipped to npm, never committed.
+dist/

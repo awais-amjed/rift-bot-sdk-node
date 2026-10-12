@@ -284,7 +284,8 @@ export class BotSession {
         'Content-Type': contentType,
         'x-upsert': 'false',
       },
-      body: bytes,
+      // fetch's types refuse a view that might sit on a SharedArrayBuffer.
+      body: bytes as Uint8Array<ArrayBuffer>,
     });
     await this.#throwIfFailed(res);
   }

@@ -1,4 +1,4 @@
-# @rift/bot
+# @joinrift/bot-sdk
 
 Write a bot for [Rift](https://joinrift.app) in TypeScript: commands, replies,
 live panels, DMs, and voice, against any self-hosted Rift server.
@@ -8,16 +8,17 @@ It signs in the same way, sits under the same permissions, and can never read
 more than it has been granted. Channels stay end-to-end encrypted; a bot only
 reads a channel if an admin hands it that channel's key.
 
-> Not on npm yet (0.1.0): clone this repository and import from
-> `src/index.ts`.
-
 ## Quick start
 
-Node 22 or newer runs TypeScript directly, so there is nothing to build and,
-for a text bot, nothing to install.
+```bash
+npm install @joinrift/bot-sdk
+```
+
+It has no dependencies of its own and ships with its types. Node 22.18 or
+newer runs a `.ts` file directly, so a bot needs no build step either.
 
 ```ts
-import { Bot, BotSession, args, command } from './src/index.ts';
+import { Bot, BotSession, args, command } from '@joinrift/bot-sdk';
 
 // First run: join with a bot invite from the server's admin.
 const session = await BotSession.join({ invite, seed, username: 'echo' });
@@ -36,7 +37,7 @@ await bot.listen(async (message) => {
 so keep it out of version control. An invite is spent once used, so save
 `session.config` beside the seed.
 
-The examples run as-is:
+The examples in this repository import the source directly and run as-is:
 
 ```bash
 node example/echo_bot.ts <url> <anonKey> <serverId> <seedFile>
@@ -56,6 +57,9 @@ Voice needs one optional dependency, loaded only when a bot joins a call:
 ```bash
 npm install @livekit/rtc-node
 ```
+
+It ships native code for glibc only, so a bot with voice runs on a Debian-based
+image (`node:24-slim`), not Alpine.
 
 ## What a bot can do
 
@@ -81,6 +85,7 @@ key rotation mid-call, send attachments — is listed in the
 
 ```bash
 npm test
+npm run typecheck
 ```
 
 Includes `test/wire.test.ts`, which checks this package byte for byte against

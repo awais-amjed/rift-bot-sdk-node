@@ -1,14 +1,40 @@
 {
-  "name": "@rift/bot",
+  "name": "@joinrift/bot-sdk",
   "version": "0.1.0",
   "license": "Apache-2.0",
   "description": "Write a Rift bot. Auth, commands, replies, panels and voice against a self-hosted server.",
+  "keywords": [
+    "rift",
+    "bot",
+    "sdk",
+    "chat",
+    "voice",
+    "end-to-end-encryption"
+  ],
+  "homepage": "https://joinrift.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/awais-amjed/rift-bot-sdk.git"
+  },
   "type": "module",
-  "exports": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "docs",
+    "WIRE.md"
+  ],
   "engines": {
     "node": ">=22"
   },
   "scripts": {
+    "build": "rm -rf dist && tsc -p .",
+    "prepack": "npm run build",
+    "typecheck": "tsc -p . --noEmit",
     "test": "node --test test/*.test.ts"
   },
   "peerDependencies": {
@@ -20,6 +46,8 @@
     }
   },
   "devDependencies": {
-    "@livekit/rtc-node": "^1.0.0"
+    "@livekit/rtc-node": "^1.0.0",
+    "@types/node": "^22.20.5",
+    "typescript": "^5.9.3"
   }
 }
