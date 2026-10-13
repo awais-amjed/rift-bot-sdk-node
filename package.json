@@ -14,7 +14,7 @@
   "homepage": "https://joinrift.app",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/awais-amjed/rift-bot-sdk.git"
+    "url": "git+https://github.com/awais-amjed/rift-bot-sdk-node.git"
   },
   "type": "module",
   "exports": {
