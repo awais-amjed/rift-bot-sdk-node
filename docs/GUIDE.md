@@ -311,10 +311,12 @@ are in, decodes with `ffmpeg`, and puts a Stop button on a panel.
 **Playing music, say so:** `voice.play(pcm, { quality: 'music' })`. The default
 is LiveKit's, made for a voice — about 32 kbps and DTX, which sends next to
 nothing while it is quiet — and a song played through it came out dull and
-smeared. `music` is 128 kbps with DTX off. It is still sent mono, and Rift's
-desktop clients play everything mono and nothing much above 16 kHz (see the
-app's ARCHITECTURE.md, *How a call is played out on the desktop*), so that is
-the ceiling a listener hears whatever is sent.
+smeared. `music` is 128 kbps with DTX off. It is still sent mono:
+`@livekit/rtc-node` never tells the server a two-channel track is stereo. A
+bot built on the Rust SDK, `rift-bot-sdk-rust`, plays in stereo. Rift's
+desktop clients play up to about 15 kHz (see the app's ARCHITECTURE.md, *How
+a call is played out on the desktop*), so that is the ceiling a listener hears
+whatever is sent.
 
 `voice.stats()` hands back WebRTC's own figures for the connection — what is
 actually going out, at what bitrate, with which codec settings. Look there
