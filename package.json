@@ -46,8 +46,8 @@
     }
   },
   "devDependencies": {
-    "@livekit/rtc-node": "^1.0.0",
+    "@livekit/rtc-node": "^1.1.0",
     "@types/node": "^22.20.5",
-    "typescript": "^5.9.3"
+    "typescript": "^7.0.2"
   }
 }
