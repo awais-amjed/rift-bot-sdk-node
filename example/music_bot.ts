@@ -2,7 +2,7 @@
 // with a panel to stop it. Roughly the thing people ask for first, and the
 // reason `joinVoice` exists.
 //
-//   npm install @livekit/rtc-node          # voice is an optional peer
+//   npm install @joinrift/rtc-node         # voice is an optional peer
 //   node example/music_bot.ts <url> <anonKey> <serverId> <seedFile>
 //
 // Needs `ffmpeg` on PATH. This package has no opinion about codecs — it

@@ -27,10 +27,13 @@ import { announcePlace } from './voice_location.ts';
  * channel key. Until some member has been in the channel, there is no key and
  * `get_channel_token` says so rather than letting the bot join inaudibly.
  *
- * The media itself is `@livekit/rtc-node`'s, imported here and nowhere else and
+ * The media itself is `@joinrift/rtc-node`'s, imported here and nowhere else and
  * only when {@link Bot.joinVoice} is called. That is why it is an optional
  * dependency rather than a real one: a bot that answers `/echo` should not
- * install a WebRTC stack it never loads, and most bots are that bot.
+ * install a WebRTC stack it never loads, and most bots are that bot. It is
+ * LiveKit's `@livekit/rtc-node` with native bindings that publish a
+ * two-channel track in stereo; upstream's are always mono (`RIFT.md` in the
+ * fork).
  */
 
 /**
@@ -44,7 +47,7 @@ interface RtcE2EEManager {
   keyProvider?: { setSharedKey(key: Uint8Array, keyIndex: number): void };
 }
 
-/** The shape of `@livekit/rtc-node` this file uses, so the rest stays typed. */
+/** The shape of `@joinrift/rtc-node` this file uses, so the rest stays typed. */
 interface RtcModule {
   Room: new () => RtcRoom;
   AudioSource: new (sampleRate: number, channels: number) => RtcAudioSource;
@@ -413,18 +416,18 @@ export function grantAllowsSubscribe(token: string): boolean {
 }
 
 /**
- * `@livekit/rtc-node`, or an error that says what to install.
+ * `@joinrift/rtc-node`, or an error that says what to install.
  *
  * A bare "Cannot find module" from a dynamic import inside a dependency is one
  * of the less helpful things a runtime says, and the fix here is one command.
  */
 async function loadRtc(): Promise<RtcModule> {
   try {
-    return (await import('@livekit/rtc-node')) as unknown as RtcModule;
+    return (await import('@joinrift/rtc-node')) as unknown as RtcModule;
   } catch {
     throw new BotError(
-      'Voice needs @livekit/rtc-node, which this package does not install by ' +
-        'default. Run: npm install @livekit/rtc-node',
+      'Voice needs @joinrift/rtc-node, which this package does not install by ' +
+        'default. Run: npm install @joinrift/rtc-node',
     );
   }
 }

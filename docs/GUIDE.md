@@ -311,9 +311,11 @@ are in, decodes with `ffmpeg`, and puts a Stop button on a panel.
 **Playing music, say so:** `voice.play(pcm, { quality: 'music' })`. The default
 is LiveKit's, made for a voice — about 32 kbps and DTX, which sends next to
 nothing while it is quiet — and a song played through it came out dull and
-smeared. `music` is 128 kbps with DTX off. It is still sent mono:
-`@livekit/rtc-node` never tells the server a two-channel track is stereo. A
-bot built on the Rust SDK, `rift-bot-sdk-rust`, plays in stereo. Rift's
+smeared. `music` is 128 kbps stereo with DTX off. Stereo needs
+`@joinrift/rtc-node` rather than LiveKit's `@livekit/rtc-node`, which never
+tells the server a two-channel track is stereo, so everything it sends is
+mono. Rift 1.5.0-beta.1 or newer plays the stereo; an older Rift plays it in
+mono. Rift's
 desktop clients play up to about 15 kHz (see the app's ARCHITECTURE.md, *How
 a call is played out on the desktop*), so that is the ceiling a listener hears
 whatever is sent.
@@ -370,16 +372,16 @@ letting the bot join and publish frames nobody can open.
 
 ### Installing it
 
-Media is `@livekit/rtc-node`, an **optional peer dependency**, imported only by
+Media is `@joinrift/rtc-node`, an **optional peer dependency**, imported only by
 `joinVoice`. A bot that answers `/echo` never loads a WebRTC stack.
 
 ```bash
-npm install @livekit/rtc-node   # in *your* bot's package
+npm install @joinrift/rtc-node  # in *your* bot's package
 ```
 
 Inside this repo it is already a devDependency, because the examples need it —
 a plain `npm install` is enough to run `music_bot.ts`. (Running
-`npm install @livekit/rtc-node` *here* does nothing: npm will not install a
+`npm install @joinrift/rtc-node` *here* does nothing: npm will not install a
 package the root declares as an optional peer of itself.)
 
 Decoding is yours. This package publishes PCM and has no opinion about codecs,
@@ -441,7 +443,7 @@ installs — which is the one moment that sentence is still a decision.
 
 - **Hearing a call.** The grant exists and the token honours it, but this
   package has no `onAudio`: a granted bot connects and subscribes, and reading
-  the frames is `@livekit/rtc-node`'s API directly for now.
+  the frames is `@joinrift/rtc-node`'s API directly for now.
 - **Surviving a key rotation mid-call.** Removing somebody from a channel
   rotates its key, and the bot's key is derived from it. This package sets the
   key once, when it joins, and does not yet fetch the new one — so a bot that

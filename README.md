@@ -55,8 +55,12 @@ node example/echo_bot.ts <url> <anonKey> <serverId> <seedFile>
 Voice needs one optional dependency, loaded only when a bot joins a call:
 
 ```bash
-npm install @livekit/rtc-node
+npm install @joinrift/rtc-node
 ```
+
+That is LiveKit's Node SDK with native bindings that publish in stereo;
+LiveKit's own `@livekit/rtc-node` sends every track mono. Before 0.2.0 this
+package used `@livekit/rtc-node`: swap one for the other when you upgrade.
 
 It ships native code for glibc only, so a bot with voice runs on a Debian-based
 image (`node:24-slim`), not Alpine.
@@ -100,7 +104,7 @@ means.
 | [`rift`](https://github.com/awais-amjed/rift) | the app — Flutter client for desktop, mobile and web |
 | [`rift-self-host`](https://github.com/awais-amjed/rift-self-host) | a server anyone can run — where a bot lives |
 | **`rift-bot-sdk-node`** | this: the TypeScript SDK for building bots |
-| [`rift-bot-sdk-rust`](https://github.com/awais-amjed/rift-bot-sdk-rust) | the Rust SDK, whose bots play in stereo |
+| [`rift-bot-sdk-rust`](https://github.com/awais-amjed/rift-bot-sdk-rust) | the Rust SDK, whose bots also play in stereo |
 
 ## License
 

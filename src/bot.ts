@@ -544,7 +544,7 @@ export class Bot {
    * arrives. A music bot is unaffected: playing is the half that never needed
    * a grant.
    *
-   * Needs `@livekit/rtc-node`, which is an optional dependency and is imported
+   * Needs `@joinrift/rtc-node`, which is an optional dependency and is imported
    * only by this call. A text bot never loads a WebRTC stack.
    */
   joinVoice(channelId: string, options?: VoiceOptions): Promise<VoiceConnection> {
