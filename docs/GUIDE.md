@@ -330,6 +330,13 @@ of the room — in a private channel before the bot could even look the channel 
 drop it, stop what was feeding it, and `joinVoice` afresh next time, as the
 example does.
 
+**Members see the bot come and go.** `joinVoice` tells the server's members
+which channel the bot is in, and the connection tells them again when it
+closes, for any reason. It is the same message a member's app sends when it
+moves. Before 0.1.3 a bot said nothing, and a member's sidebar could keep
+drawing it in a call it had left until that member restarted Rift. Call
+`leave()` rather than just exiting: it resolves once members have been told.
+
 **Calls are end-to-end encrypted**, and a bot is audible and deaf at the same
 time. Two things hold that, and only the second is arithmetic:
 

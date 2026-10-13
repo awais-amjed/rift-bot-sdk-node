@@ -6,6 +6,7 @@ import {
   SAMPLE_RATE,
   audioFrames,
 } from './audio_frames.ts';
+import { announcePlace } from './voice_location.ts';
 
 /**
  * A bot in a voice channel.
@@ -129,6 +130,8 @@ export class VoiceConnection {
    * up by is already gone), so the connection is the only thing that knows. A
    * bot holding connections in a map drops this one here and stops whatever
    * fed it; a closed connection cannot play again — join anew.
+   *
+   * Members are told the bot left either way (`voice_location.ts`).
    */
   readonly closed: Promise<void>;
 
@@ -137,6 +140,8 @@ export class VoiceConnection {
   #source: RtcAudioSource | null = null;
   #playing = false;
   #connected = true;
+  /** Telling members this bot left, once it has. */
+  #saidLeft: Promise<void> = Promise.resolve();
 
   /**
    * Which slot in LiveKit's key ring this bot's key occupies.
@@ -154,6 +159,7 @@ export class VoiceConnection {
     rtc: RtcModule,
     room: RtcRoom,
     keyIndex: number,
+    session: BotSession | null = null,
   ) {
     this.channelId = channelId;
     this.canHear = canHear;
@@ -166,6 +172,7 @@ export class VoiceConnection {
         // Ends a running {@link play} at its next frame, rather than leaving
         // it to fail on a source the room has already torn down.
         this.#playing = false;
+        if (session) this.#saidLeft = announcePlace(session, (p) => p.leave(channelId));
         resolve();
       });
     });
@@ -239,11 +246,16 @@ export class VoiceConnection {
     return this.#room.getRtcStats();
   }
 
-  /** Leave the call. */
+  /**
+   * Leave the call. Resolves once members have been told, so a bot that
+   * leaves and then exits does not take the message down with it.
+   */
   async leave(): Promise<void> {
     this.stop();
     await this.#source?.close?.();
     await this.#room.disconnect();
+    await this.closed;
+    await this.#saidLeft;
   }
 }
 
@@ -304,13 +316,18 @@ export async function joinVoice(
   const manager = (room as unknown as { e2eeManager?: RtcE2EEManager }).e2eeManager;
   manager?.keyProvider?.setSharedKey(media.key, BOT_KEY_INDEX);
 
-  return new VoiceConnection(
+  const connection = new VoiceConnection(
     channelId,
     grantAllowsSubscribe(token),
     rtc,
     room,
     BOT_KEY_INDEX,
+    session,
   );
+  // Not awaited: members hearing of the arrival a moment late is no reason
+  // to hold the first song back.
+  void announcePlace(session, (p) => p.enter(channelId));
+  return connection;
 }
 
 /** How long {@link mediaKey} waits for a member to seal one, and how often. */
