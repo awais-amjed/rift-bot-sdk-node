@@ -316,8 +316,8 @@ smeared. `music` is 128 kbps stereo with DTX off. Stereo needs
 tells the server a two-channel track is stereo, so everything it sends is
 mono. Rift 1.5.0-beta.1 or newer plays the stereo; an older Rift plays it in
 mono. Rift's
-desktop clients play up to about 15 kHz (see the app's ARCHITECTURE.md, *How
-a call is played out on the desktop*), so that is the ceiling a listener hears
+desktop clients play up to about 15 kHz (see the app's CALLS.md, *How a
+call is played out on the desktop*), so that is the ceiling a listener hears
 whatever is sent.
 
 `voice.stats()` hands back WebRTC's own figures for the connection — what is
