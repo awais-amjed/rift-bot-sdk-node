@@ -174,8 +174,17 @@ marked live, and Rift then draws it in a bar on top of the channel's message box
 instead of in the history, so it does not scroll away. Pass `live` on the post
 and on every redraw, and leave it out (or pass `false`) on the last one: the
 panel goes back into the history where it was posted, saying what that redraw
-says. Rift shows a live panel only while the bot is connected, so one left
-marked by a crash is just an ordinary panel.
+says. Rift shows a live panel only while the bot is connected, and only the
+newest of a bot's, so one left marked by a crash is just an ordinary panel —
+until the bot comes back. Clear your leftovers when you start, before posting a
+new one:
+
+```ts
+const leftLive = await bot.session.select<{ id: number; channel_id: string }>(
+  `messages?select=id,channel_id&sender_id=eq.${bot.session.userId}&blocks->live=eq.true`,
+);
+for (const p of leftLive) await bot.editPanel(p.channel_id, p.id, finished);
+```
 
 ```ts
 const id = await bot.panel(channelId, playing, { live: true });
