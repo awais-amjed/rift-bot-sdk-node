@@ -7,7 +7,7 @@ export {
   type Suggestion,
   type SuggestRequest,
 } from './suggest.ts';
-export { Bot, isAction, command, args, type BotMessage, type PanelBlock, type PanelOptions } from './bot.ts';
+export { Bot, isAction, command, args, type BotMessage, type PanelBlock, type PanelOptions, type EditPanelOptions } from './bot.ts';
 export { imageInfo, type ImageInfo } from './image.ts';
 export {
   VoiceConnection,

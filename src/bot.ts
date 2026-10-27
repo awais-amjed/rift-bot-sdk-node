@@ -62,6 +62,24 @@ export interface PanelOptions {
    * cannot see.
    */
   readonly onlyFor?: string;
+
+  /**
+   * This is the bot's current panel — a player while it plays. Rift draws it in
+   * the bar above the channel's message box rather than in the history, while
+   * the bot is connected, so it does not scroll away. Redraw with `live: false`
+   * (or leave it out) when it stops being current. WIRE.md §5.
+   */
+  readonly live?: boolean;
+}
+
+/** How a redraw marks the panel. See {@link PanelOptions.live}. */
+export interface EditPanelOptions {
+  readonly live?: boolean;
+}
+
+/** A panel row's `blocks` column: `live` only when it is. */
+function panelBlocks(blocks: PanelBlock[], live: boolean | undefined): Record<string, unknown> {
+  return live ? { v: 1, live: true, blocks } : { v: 1, blocks };
 }
 
 /**
@@ -433,7 +451,7 @@ export class Bot {
     const rows = await this.session.insertReturning<{ id: number }>('messages', {
       channel_id: channelId,
       ...envelope,
-      blocks: { v: 1, blocks },
+      blocks: panelBlocks(blocks, options.live),
       ...(options.onlyFor ? { ephemeral_for: options.onlyFor } : {}),
     });
     return rows.length === 0 ? null : rows[0].id;
@@ -557,10 +575,20 @@ export class Bot {
    * [channelId] is no longer used for anything and is kept so calls do not
    * have to change: the database announces the edit itself, to everyone who
    * may see the channel it is in.
+   *
+   * Pass `live` on every redraw of a live panel: a redraw without it takes the
+   * panel out of the bar and back into the history.
    */
-  async editPanel(channelId: string, panelId: number, blocks: PanelBlock[]): Promise<void> {
+  async editPanel(
+    channelId: string,
+    panelId: number,
+    blocks: PanelBlock[],
+    options: EditPanelOptions = {},
+  ): Promise<void> {
     void channelId;
-    await this.session.patch(`messages?id=eq.${panelId}`, { blocks: { v: 1, blocks } });
+    await this.session.patch(`messages?id=eq.${panelId}`, {
+      blocks: panelBlocks(blocks, options.live),
+    });
   }
 
   async #drain(onMessage: (message: BotMessage) => void | Promise<void>): Promise<void> {

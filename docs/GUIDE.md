@@ -169,6 +169,25 @@ const id = await bot.panel(channelId, [
 ]);
 ```
 
+A panel that is the bot's *current* one — a player while it plays — can be
+marked live, and Rift then draws it in a bar on top of the channel's message box
+instead of in the history, so it does not scroll away. Pass `live` on the post
+and on every redraw, and leave it out (or pass `false`) on the last one: the
+panel goes back into the history where it was posted, saying what that redraw
+says. Rift shows a live panel only while the bot is connected, so one left
+marked by a crash is just an ordinary panel.
+
+```ts
+const id = await bot.panel(channelId, playing, { live: true });
+await bot.editPanel(channelId, id, playing, { live: true });
+await bot.editPanel(channelId, id, [{ type: 'text', text: 'Left the call' }]);
+```
+
+The bar folds a live panel to one line built from its own blocks: the first
+`image` as a cover, the first `fields` block's first two values (or the first
+`heading`), up to two buttons from the first `actions` block that are not
+`danger`, and the first `progress` as a thin line.
+
 `bot.deletePanel(id)` takes a panel away once its job is done — a choice made,
 or one nobody answered. A panel posted `onlyFor` one member is hidden from the
 rest of the channel, but a press names its panel only by id, so check
