@@ -434,12 +434,16 @@ alone.
 which is what shows it as online in members' lists while it runs. Nothing is
 read from that topic. A bot polling alone joins neither, so it shows as offline.
 
-A session lasts an hour. The poll signs in again when one of its reads comes
-back 401, and tells the socket the new token. A call of your own can get there
-first — a panel redraw an hour into a playlist — so catch a `BotError` with
-`status === 401`, call `bot.renewSession()`, and try once more. Calling
-`session.login()` instead leaves the socket on the old token, and the bot drops
-back to polling without a word.
+A session lasts an hour, and Realtime closes the bot's topics the second it
+runs out. So `listen` signs in again five minutes before that and hands the
+sockets the new token, and a topic the server closed anyway — a restart, a
+token that ran out while the bot was asleep — is joined again and the bot
+announced again. A bot that waited for a refusal instead went offline an hour
+after every start (fixed in 0.2.1). The poll still signs in again on a 401, and
+a call of your own can get one first — the machine slept through the renewal —
+so catch a `BotError` with `status === 401`, call `bot.renewSession()`, and try
+once more. Calling `session.login()` instead leaves the socket on the old
+token.
 
 Replies, panels and DMs need no announcement of their own — the database makes
 it when the row is written, which is also why a bot's answers now appear for

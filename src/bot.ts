@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto';
 
 import { signedPayload, sign } from './crypto.ts';
 import { imageInfo } from './image.ts';
-import { BotError, type BotSession } from './session.ts';
+import { BotError, renewDelayMs, type BotSession } from './session.ts';
 import { joinVoice, type VoiceConnection, type VoiceOptions } from './voice.ts';
 import { DirectMessages, type DirectMessage } from './dm.ts';
 import { RealtimeListener } from './realtime.ts';
@@ -111,6 +111,8 @@ export class Bot {
   #lastSeen = 0;
   #lastDm = 0;
   #timer: NodeJS.Timeout | null = null;
+  /// When the session is signed in again, a little before it runs out.
+  #renewal: NodeJS.Timeout | null = null;
 
   /// Direct messages, which are the one thing a bot both opens and seals. See
   /// [DirectMessages] — they are held apart from channel replies because the
@@ -307,6 +309,7 @@ export class Bot {
     this.#lastSeen = await this.#newestId();
     if (this.#onDirectMessage) this.#lastDm = await this.dms.newestId();
     this.#timer = setInterval(() => void this.#drain(onMessage), this.pollMs);
+    this.#renewSoon();
     if (this.#useRealtime) {
       this.#startRealtime(onMessage);
       await this.#startPresence();
@@ -317,21 +320,41 @@ export class Bot {
    * Sign in again after the session expired, and hand the new token to the
    * realtime socket.
    *
-   * The polling loop does this itself when one of its reads comes back 401.
-   * Call it when one of *your* calls does — a panel redraw an hour into a
-   * song — and retry the call. Logging in through `session.login()` alone would
-   * leave the socket on the old token: the server closes a topic whose token
-   * runs out, and the bot drops back to polling without a word.
+   * `listen` does this itself five minutes before the session runs out, and
+   * the polling loop when one of its reads comes back 401. Call it when one of
+   * *your* calls does — the machine slept through the renewal — and retry the
+   * call. Logging in through `session.login()` alone would leave the socket on
+   * the old token.
    */
   async renewSession(): Promise<void> {
     await this.session.login();
     this.#realtime?.setToken(this.session.token ?? '');
     this.#presence?.setToken(this.session.token ?? '');
+    if (this.#timer) this.#renewSoon();
+  }
+
+  /**
+   * Sign in again before the session runs out, so the socket's topics never
+   * close under it. Rescheduled by every renewal, this one's or a 401's; a
+   * failed one is tried again shortly, and the poll's 401 still backs it up.
+   */
+  #renewSoon(): void {
+    if (this.#renewal) clearTimeout(this.#renewal);
+    this.#renewal = setTimeout(() => {
+      this.#renewal = null;
+      this.renewSession().catch((error) => {
+        this.#reportError(error instanceof BotError ? error : new BotError(String(error)));
+        if (this.#timer) this.#renewSoon();
+      });
+    }, renewDelayMs(this.session.token ?? '', Date.now()));
+    this.#renewal.unref();
   }
 
   stop(): void {
     if (this.#timer) clearInterval(this.#timer);
     this.#timer = null;
+    if (this.#renewal) clearTimeout(this.#renewal);
+    this.#renewal = null;
     if (this.#queued) clearTimeout(this.#queued);
     this.#queued = null;
     this.#realtime?.stop();

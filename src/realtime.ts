@@ -90,6 +90,9 @@ export class RealtimeListener {
   #ref = 0;
   /** The ref of the latest join, so its reply can be told from the others'. */
   #joinRef: string | null = null;
+  /** Whether the server accepted the latest join and has not closed it since. */
+  #joined = false;
+  #rejoin: ReturnType<typeof setTimeout> | null = null;
   #token: string;
   #stopped = false;
 
@@ -100,7 +103,7 @@ export class RealtimeListener {
 
   /** Whether the topic is joined right now. */
   get connected(): boolean {
-    return this.#socket?.readyState === OPEN;
+    return this.#socket?.readyState === OPEN && this.#joined;
   }
 
   start(): void {
@@ -118,12 +121,17 @@ export class RealtimeListener {
   /**
    * Carry on with a new JWT.
    *
-   * A bot's token expires within the hour and it signs in again; the server
-   * closes a topic whose token has run out, so the new one has to reach it.
+   * A bot's token expires within the hour and it signs in again. A topic still
+   * joined is handed the new one; one the server closed when the old one ran
+   * out is joined again with it.
    */
   setToken(token: string): void {
     this.#token = token;
-    if (!this.connected) return;
+    if (this.#socket?.readyState !== OPEN) return;
+    if (!this.#joined) {
+      this.#join();
+      return;
+    }
     this.#send({
       topic: this.#phoenixTopic,
       event: 'access_token',
@@ -154,23 +162,7 @@ export class RealtimeListener {
 
     socket.addEventListener('open', () => {
       this.#attempt = 0;
-      // The topic is private, so the join carries the token the server checks
-      // `app.can_use_topic` with. Without `private` it would join a different,
-      // public topic of the same name and hear nothing.
-      this.#joinRef = String(++this.#ref);
-      this.#send({
-        topic: this.#phoenixTopic,
-        event: 'phx_join',
-        payload: {
-          config: {
-            broadcast: { self: false },
-            presence: { key: '', enabled: this.#options.presence !== undefined },
-            private: true,
-          },
-          access_token: this.#token,
-        },
-        ref: this.#joinRef,
-      });
+      this.#join();
       this.#heartbeat = unref(
         setInterval(() => {
           this.#send({
@@ -186,6 +178,50 @@ export class RealtimeListener {
     socket.addEventListener('message', (frame) => this.#received(frame.data));
     socket.addEventListener('error', () => {});
     socket.addEventListener('close', () => this.#failed(null));
+  }
+
+  /**
+   * The topic is private, so the join carries the token the server checks
+   * `app.can_use_topic` with. Without `private` it would join a different,
+   * public topic of the same name and hear nothing.
+   */
+  #join(): void {
+    if (this.#rejoin) clearTimeout(this.#rejoin);
+    this.#rejoin = null;
+    this.#joined = false;
+    this.#joinRef = String(++this.#ref);
+    this.#send({
+      topic: this.#phoenixTopic,
+      event: 'phx_join',
+      payload: {
+        config: {
+          broadcast: { self: false },
+          presence: { key: '', enabled: this.#options.presence !== undefined },
+          private: true,
+        },
+        access_token: this.#token,
+      },
+      ref: this.#joinRef,
+    });
+  }
+
+  /**
+   * The server let go of the topic and kept the socket: its token ran out, or
+   * the topic's process failed. Join again after the same backoff a dropped
+   * socket waits, with whatever token is newest by then — a stale one is
+   * refused, and the next {@link setToken} joins with the fresh one.
+   */
+  #lost(): void {
+    this.#joined = false;
+    if (this.#rejoin || this.#stopped) return;
+    const wait = RETRY_MS[Math.min(this.#attempt, RETRY_MS.length - 1)];
+    this.#attempt++;
+    this.#rejoin = unref(
+      setTimeout(() => {
+        this.#rejoin = null;
+        if (this.#socket?.readyState === OPEN) this.#join();
+      }, wait),
+    );
   }
 
   #received(data: unknown): void {
@@ -215,6 +251,11 @@ export class RealtimeListener {
       return;
     }
 
+    if (frame.event === 'phx_close' || frame.event === 'phx_error') {
+      this.#lost();
+      return;
+    }
+
     // A refused join answers here rather than closing the socket — the topic
     // is simply never joined, which otherwise looks like a quiet server.
     if (frame.event === 'phx_reply') {
@@ -222,6 +263,8 @@ export class RealtimeListener {
       // Tracked on every join, a rejoin included: the server forgets an
       // entry when its socket drops, and joining again does not bring it back.
       if (payload.status === 'ok' && frame.ref === this.#joinRef) {
+        this.#joined = true;
+        this.#attempt = 0;
         this.#track();
         return;
       }
@@ -231,6 +274,12 @@ export class RealtimeListener {
           response && typeof response === 'object' && 'reason' in response
             ? String((response as { reason: unknown }).reason)
             : 'refused';
+        // Said to anything sent to a topic the server has already closed,
+        // whose own `phx_close` this socket never got.
+        if (reason === 'unmatched topic') {
+          this.#lost();
+          return;
+        }
         this.#report(new Error(`realtime: ${this.#options.topic}: ${reason}`));
       }
     }
@@ -258,6 +307,7 @@ export class RealtimeListener {
   #failed(error: unknown): void {
     this.#clearTimers();
     this.#socket = null;
+    this.#joined = false;
     if (error) this.#report(error);
     if (this.#stopped) return;
     const wait = RETRY_MS[Math.min(this.#attempt, RETRY_MS.length - 1)];
@@ -268,8 +318,10 @@ export class RealtimeListener {
   #clearTimers(): void {
     if (this.#heartbeat) clearInterval(this.#heartbeat);
     if (this.#retry) clearTimeout(this.#retry);
+    if (this.#rejoin) clearTimeout(this.#rejoin);
     this.#heartbeat = null;
     this.#retry = null;
+    this.#rejoin = null;
   }
 
   #report(error: unknown): void {

@@ -128,6 +128,7 @@ test('a new token is sent to the topic already joined', () => {
   const { subject, socket } = listener();
   subject.start();
   socket.open();
+  socket.deliver({ topic: 'realtime:user:bot-1', event: 'phx_reply', ref: socket.join?.ref, payload: { status: 'ok' } });
 
   subject.setToken('jwt-2');
 
@@ -220,4 +221,76 @@ test('a listener without presence joins with it off and never tracks', () => {
 
   assert.equal(socket.join?.payload.config.presence.enabled, false);
   assert.equal(tracks(socket).length, 0);
+});
+
+// ── A topic the server closes ──────────────────────────────────────────────
+//
+// Realtime closes a topic the moment its token runs out — "Token has expired"
+// then `phx_close` — and leaves the socket open. A new token pushed to it then
+// answers "unmatched topic". A bot that only pushed went offline an hour after
+// every start and stayed that way (seen on a live server Oct 27).
+
+const joins = (socket: FakeSocket) =>
+  socket.sent.filter((message) => message.event === 'phx_join');
+
+function closeTopic(socket: FakeSocket, topic: string): void {
+  socket.deliver({
+    topic,
+    event: 'system',
+    payload: { message: 'Token has expired 0 seconds ago', status: 'error', extension: 'system' },
+  });
+  socket.deliver({ topic, event: 'phx_close', payload: {} });
+}
+
+test('a topic the server closes is joined again, and its presence tracked again', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+  const { subject, socket } = presenceListener();
+  subject.start();
+  socket.open();
+  socket.deliver({ topic: 'realtime:presence:server-1', event: 'phx_reply', ref: socket.join?.ref, payload: { status: 'ok' } });
+  assert.equal(subject.connected, true);
+
+  closeTopic(socket, 'realtime:presence:server-1');
+  assert.equal(subject.connected, false, 'a closed topic is not joined');
+
+  t.mock.timers.tick(1_000);
+  const rejoin = joins(socket).at(-1);
+  assert.equal(joins(socket).length, 2);
+  socket.deliver({ topic: 'realtime:presence:server-1', event: 'phx_reply', ref: rejoin?.ref, payload: { status: 'ok' } });
+
+  assert.equal(tracks(socket).length, 2);
+  assert.equal(subject.connected, true);
+});
+
+test('a new token reaches a closed topic as a join, not an update', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+  const { subject, socket } = listener();
+  subject.start();
+  socket.open();
+  socket.deliver({ topic: 'realtime:user:bot-1', event: 'phx_reply', ref: socket.join?.ref, payload: { status: 'ok' } });
+  closeTopic(socket, 'realtime:user:bot-1');
+
+  subject.setToken('jwt-2');
+
+  assert.equal(joins(socket).at(-1)?.payload.access_token, 'jwt-2');
+  assert.equal(socket.sent.some((message) => message.event === 'access_token'), false);
+  t.mock.timers.tick(30_000);
+  assert.equal(joins(socket).length, 2, 'and not joined twice');
+});
+
+test('an update the server no longer knows the topic for joins it again', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+  const { subject, socket, state } = listener();
+  subject.start();
+  socket.open();
+  socket.deliver({ topic: 'realtime:user:bot-1', event: 'phx_reply', ref: socket.join?.ref, payload: { status: 'ok' } });
+  subject.setToken('jwt-2');
+  const update = socket.sent.find((message) => message.event === 'access_token');
+
+  socket.deliver({ topic: 'realtime:user:bot-1', event: 'phx_reply', ref: update?.ref, payload: { status: 'error', response: { reason: 'unmatched topic' } } });
+  t.mock.timers.tick(1_000);
+
+  assert.equal(joins(socket).at(-1)?.payload.access_token, 'jwt-2');
+  assert.equal(joins(socket).length, 2);
+  assert.deepEqual(state.errors, [], 'nothing wrong worth reporting');
 });

@@ -361,6 +361,29 @@ async function request(url: string, init: RequestInit = {}): Promise<Response> {
   }
 }
 
+/** How long before a session runs out a bot signs in again. */
+const RENEW_EARLY_MS = 5 * 60_000;
+
+/** The soonest a renewal is tried again: never a tight loop. */
+const RENEW_SOONEST_MS = 30_000;
+
+/**
+ * How long from `nowMs` until the session in `token` should be renewed.
+ *
+ * Ahead of time, because Realtime closes a topic the second its token runs
+ * out: a bot that waited for a refusal was already offline when it got one.
+ */
+export function renewDelayMs(token: string, nowMs: number): number {
+  let exp: unknown;
+  try {
+    exp = JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8')).exp;
+  } catch {
+    return RENEW_SOONEST_MS;
+  }
+  if (typeof exp !== 'number') return RENEW_SOONEST_MS;
+  return Math.max(exp * 1000 - RENEW_EARLY_MS - nowMs, RENEW_SOONEST_MS);
+}
+
 /** The `sub` claim — this bot's user id, which `users.id` is. */
 function subjectOf(token: string): string {
   const payload = token.split('.')[1];
