@@ -70,16 +70,28 @@ export interface PanelOptions {
    * (or leave it out) when it stops being current. WIRE.md §5.
    */
   readonly live?: boolean;
+
+  /**
+   * The voice channel a live panel plays to. It is then the call's: everyone
+   * who can see that channel may read and press it, even from outside the
+   * channel it was posted in, and Rift shows it to the people in the call in
+   * every channel they read. Check a press came from somebody in the call all
+   * the same. Ignored without `live`; a server from before it ignores it too,
+   * and keeps the panel to its channel's readers. WIRE.md §5.
+   */
+  readonly call?: string;
 }
 
-/** How a redraw marks the panel. See {@link PanelOptions.live}. */
+/** How a redraw marks the panel. See {@link PanelOptions.live} and {@link PanelOptions.call}. */
 export interface EditPanelOptions {
   readonly live?: boolean;
+  readonly call?: string;
 }
 
-/** A panel row's `blocks` column: `live` only when it is. */
-function panelBlocks(blocks: PanelBlock[], live: boolean | undefined): Record<string, unknown> {
-  return live ? { v: 1, live: true, blocks } : { v: 1, blocks };
+/** A panel row's `blocks` column: `live` only when it is, and `call` only on a live one. */
+function panelBlocks(blocks: PanelBlock[], options: EditPanelOptions): Record<string, unknown> {
+  if (!options.live) return { v: 1, blocks };
+  return options.call ? { v: 1, live: true, call: options.call, blocks } : { v: 1, live: true, blocks };
 }
 
 /**
@@ -474,7 +486,7 @@ export class Bot {
     const rows = await this.session.insertReturning<{ id: number }>('messages', {
       channel_id: channelId,
       ...envelope,
-      blocks: panelBlocks(blocks, options.live),
+      blocks: panelBlocks(blocks, options),
       ...(options.onlyFor ? { ephemeral_for: options.onlyFor } : {}),
     });
     return rows.length === 0 ? null : rows[0].id;
@@ -599,8 +611,8 @@ export class Bot {
    * have to change: the database announces the edit itself, to everyone who
    * may see the channel it is in.
    *
-   * Pass `live` on every redraw of a live panel: a redraw without it takes the
-   * panel out of the bar and back into the history.
+   * Pass `live` (and `call`) on every redraw of a live panel: a redraw without
+   * it takes the panel out of the bar and back into the history.
    */
   async editPanel(
     channelId: string,
@@ -610,7 +622,7 @@ export class Bot {
   ): Promise<void> {
     void channelId;
     await this.session.patch(`messages?id=eq.${panelId}`, {
-      blocks: panelBlocks(blocks, options.live),
+      blocks: panelBlocks(blocks, options),
     });
   }
 

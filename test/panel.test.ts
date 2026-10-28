@@ -58,3 +58,27 @@ test('an edit without live leaves it out', async () => {
     assert.deepEqual(body, { blocks: { v: 1, blocks } });
   }
 });
+
+const CALL = 'cccccccc-0000-4000-8000-000000000002';
+
+test('a live panel names its call', async () => {
+  const { session, inserted, patched } = fakeSession();
+  const bot = new Bot(session, 30_000, { realtime: false });
+
+  await bot.panel(CHANNEL, blocks, { live: true, call: CALL });
+  await bot.editPanel(CHANNEL, 7, blocks, { live: true, call: CALL });
+
+  assert.deepEqual(inserted[0].blocks, { v: 1, live: true, call: CALL, blocks });
+  assert.deepEqual(patched[0].body, { blocks: { v: 1, live: true, call: CALL, blocks } });
+});
+
+test('a panel that is not live names no call', async () => {
+  const { session, inserted, patched } = fakeSession();
+  const bot = new Bot(session, 30_000, { realtime: false });
+
+  await bot.panel(CHANNEL, blocks, { call: CALL });
+  await bot.editPanel(CHANNEL, 7, blocks, { live: false, call: CALL });
+
+  assert.deepEqual(inserted[0].blocks, { v: 1, blocks });
+  assert.deepEqual(patched[0].body, { blocks: { v: 1, blocks } });
+});
