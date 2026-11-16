@@ -452,10 +452,11 @@ REST API.
 
 ## Letting people find it
 
-A finished bot can be listed in the central directory, which is where a
-server admin browses from **Manage server → Bots → Browse bots**. Listing is
-in the app, under **List a bot** in that same browser: a name, a description,
-tags, and a link to the source. Ten per account, delistable, withdrawable.
+A finished bot can be listed in the central directory. A server admin
+browses it from **Manage server → Bots → Browse bots**, or from **+ → Bots**
+on the server rail. Listing is under **List a bot** in that browser, and needs
+only a Rift account, not a server of your own: a name, a description, tags,
+and a link to the source. Ten per account, delistable, withdrawable.
 
 Nothing is verified, and the listing carries no invite — a bot has no address
 for one to point at. Adding your bot is the *admin's* server minting a
